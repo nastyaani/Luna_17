@@ -1,0 +1,6 @@
+{
+    "files.encoding": "utf8",
+    "files.autoGuessEncoding": true,
+    "python.terminal.activateEnvironment": false,
+    "code-runner.runInTerminal": true
+}
