@@ -1,55 +1,23 @@
-import numpy as np
 import time
 import math
-from progress.bar import Bar
-import random
 
 # Функции для расчетов
-def tsialkovsky_velocity(M0, Mf, Isp, g0):
-    """Формула Циолковского для расчета delta-V"""
-    return g0 * Isp * math.log(M0 / Mf)
-
 def atmospheric_density(altitude):
     """Плотность атмосферы в зависимости от высоты"""
     if altitude < 80000:
-        return 1.225 * math.exp(-altitude / 7500)
+        return 1.225 * math.exp(-altitude / 8500)
     else:
         return 0.0
 
-def aerodynamic_drag(density, velocity, Cd, A):
+def aerodynamic_drag(density, velocity, Cd, S):
     """Аэродинамическое сопротивление"""
-    return 0.5 * density * velocity**2 * Cd * A
+    return 0.5 * density * velocity**2 * Cd * S
 
 def gravity(altitude, g0=9.81):
     """Гравитация в зависимости от высоты"""
     R_earth = 6371000  # радиус Земли в метрах
     return g0 * (R_earth / (R_earth + altitude))**2
 
-#------------- ПОДГОТОВКА СИМУЛЯЦИИ ------------
-print("Выбор режима:")
-print("0 - Скоростной")
-print("1 - Медленный")
-mode = input()
-
-if mode == '1':
-    print('Подготавливаю симмуляцию Луна-17...')
-    bar = Bar('Инициализация систем', max=25)
-    for i in range(25):
-        time.sleep(random.uniform(0.1, 0.3))
-        bar.next()
-    bar.finish()
-    
-    bar = Bar('Загрузка телеметрии', max=18)
-    for i in range(18):
-        time.sleep(random.uniform(0.1, 0.3))
-        bar.next()
-    bar.finish()
-    
-    bar = Bar('Калибровка приборов', max=15)
-    for i in range(15):
-        time.sleep(random.uniform(0.1, 0.3))
-        bar.next()
-    bar.finish()
 
 # Параметры миссии Луна-17
 print("\n" + "="*50)
@@ -65,16 +33,15 @@ Isp_stage2 = 320   # удельный импульс 2й ступени, сек
 Isp_stage3 = 340   # удельный импульс 3й ступени, сек
 thrust_stage1 = 4000000  # тяга 1й ступени, Н
 
-time.sleep(3)
 
-#--- ЭТАП 1: СТАРТ И ВЫВОД НА ОПОРНУЮ ОРБИТУ ---
-print("\n=== ЭТАП 1: СТАРТ И ВЫВОД НА ОПОРНУЮ ОРБИТУ ===")
+#--- ЭТАП 1: СТАРТ И ВЫВОД НА ЗЕМНУЮ ОРБИТУ ---
+print("\n=== ЭТАП 1: СТАРТ И ВЫВОД НА ЗЕМНУЮ ОРБИТУ ===")
 
-altitude = 0
+altitude = 0 
 velocity = 0
 mass = M0_total
-Cd = 0.8
-A = 15.0
+Cd = 0.8 # коэффициент аэродинамического сопротивления (безразмерный)
+S = 15.0 # площадь поперечного сечения ракеты (м²)
 
 time_steps = [0, 10, 30, 60, 120, 180, 300, 600]
 print("Время(с) | Высота(км) | Скорость(м/с) | Масса(т)")
@@ -91,14 +58,14 @@ for t in time_steps:
     mass -= fuel_consumption
     
     # Расчет сил
-    density = atmospheric_density(altitude)
-    drag = aerodynamic_drag(density, velocity, Cd, A)
+    density = atmospheric_density(altitude) # плотность воздуха (кг/м³)
+    drag = aerodynamic_drag(density, velocity, Cd, S) # аэродинамическое сопротивление
     g = gravity(altitude)
     
     # Ускорение
     thrust = thrust_stage1
     net_force = thrust - drag - mass * g
-    acceleration = net_force / mass
+    acceleration = net_force / mass 
     
     # Обновление параметров
     velocity += acceleration * dt
@@ -142,16 +109,29 @@ print("★ Достигнута вторая космическая скорос
 time.sleep(3)
 
 #--- ЭТАП 3: ПОЛЕТ К ЛУНЕ ---
-print("\n=== ЭТАП 3: ПОЛЕТ К ЛУНЕ ===")
+print("\n=== ЭТАП 3: ПОЛЕТ К ЛУНЕ И ТОРМОЖЕНИЕ ===")
+print("-" * 50)
 
-print("Коррекция траектории...")
+G = 6.67430e-11
+M_moon = 7.3477e22
+R_moon = 1737400
+
+v_moon_orbit = 1022  # скорость Луны вокруг Земли м/с
+v_approach = 2400    # Наша скорость относительно Луны м/с
+v_earth_relative = v_approach + v_moon_orbit
+
+h_target = 100000  # Целевая орбита: высота 100 км
+r_target = R_moon + h_target
+v_orbit_moon = math.sqrt(G * M_moon / r_target)
+
+print("\nКоррекция траектории...")
 time.sleep(1)
 print("Полет по трансфертной орбите...")
 time.sleep(1)
 print("Подготовка к торможению...")
 
 # Торможение для выхода на орбиту Луны
-delta_v_moon = 900  # м/с для торможения
+delta_v_moon = v_approach - v_orbit_moon
 print(f"★ Выполнен тормозной импульс: {delta_v_moon} м/с")
 
 time.sleep(3)
