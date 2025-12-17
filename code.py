@@ -73,6 +73,9 @@ pitch_schedule = [
 
 time_steps = [10, 30, 60, 90, 110]
 
+vx = 0.0
+vy = 0.0
+    
 for t in time_steps:
     dt = t - time_elapsed
     time_elapsed = t
@@ -97,12 +100,19 @@ for t in time_steps:
     g = gravity(altitude)
     gravity_force = mass * g
     thrust = stage["thrust"]
+    
+    velocity = math.sqrt(vx**2 + vy**2)
+    
+    if velocity > 0.01:
+        velocity_angle = math.atan2(vy, vx)
+    else:
+        velocity_angle = pitch_angle
       
     thrust_x = thrust * math.cos(pitch_rad)
     thrust_y = thrust * math.sin(pitch_rad)
     
-    drag_x = drag_force * math.cos(pitch_rad)
-    drag_y = drag_force * math.sin(pitch_rad)
+    drag_x = - drag_force * math.cos(velocity_angle)
+    drag_y = - drag_force * math.sin(velocity_angle)
     
     force_x = thrust_x - drag_x
     force_y = thrust_y - drag_y - gravity_force
@@ -110,16 +120,16 @@ for t in time_steps:
     acceleration_x = force_x / mass if mass > 0 else 0
     acceleration_y = force_y / mass if mass > 0 else 0
     acceleration_total = math.sqrt(acceleration_x**2 + acceleration_y**2)
-    
+   
     current_velocity_x = velocity * math.cos(pitch_rad)
     current_velocity_y = velocity * math.sin(pitch_rad)
     
-    new_velocity_x = current_velocity_x + acceleration_x * dt
-    new_velocity_y = current_velocity_y + acceleration_y * dt
-    velocity = math.sqrt(new_velocity_x**2 + new_velocity_y**2)
+    vx = current_velocity_x + acceleration_x * dt
+    vy = current_velocity_y + acceleration_y * dt
+    velocity = math.sqrt(vx**2 + vy**2)
     
-    x_position += new_velocity_x * dt
-    y_position += new_velocity_y * dt
+    x_position += vx * dt
+    y_position += vy * dt
     altitude = y_position
     
     if x_position < 0:
@@ -203,37 +213,64 @@ print("="*80)
 stage = stages[2]
 target_deltaV = deltaV_required["Захват орбиты Муны"]
 
+g_moon = 1.63
+moon_radius = 200_000  
+
 print("Время(с) | Скорость(м/с) | OX(км) | OY(км) | Топливо(т)")
 print("-" * 80)
 
+# Начальные параметры для этапа торможения
 mass_start_brake = mass
-fuel_needed_brake = mass_start_brake - (mass_start_brake / math.exp(target_deltaV / (g0 * stage["Isp"])))
+velocity_start_brake = velocity
 
-if fuel >= fuel_needed_brake:
-    brake_time = 60
-    fuel_rate_brake = fuel_needed_brake / brake_time
+# Расчет потребного топлива
+fuel_needed_brake = mass_start_brake * (1 - 1 / math.exp(target_deltaV / (g0 * stage["Isp"])))
+
+# Параметры подлёта к Луне
+approach_angle = math.radians(30)  # угол подлёта 30° к горизонту
+initial_altitude = 100000  # начальная высота над поверхностью Луны (100 км)
+initial_horizontal_distance = 0  # начальное горизонтальное положение
+
+# Начальные компоненты скорости
+vx = velocity_start_brake * math.cos(approach_angle)
+vy = -velocity_start_brake * math.sin(approach_angle)
+
+
+brake_time = 60
+fuel_rate_brake = fuel_needed_brake / brake_time
     
-    time_steps_3 = [250, 270, 290, 310]
+time_steps_3 = [250, 270, 290, 310]
     
-    for t in time_steps_3:
-        dt = 20
-        time_elapsed = t
-        
-        fuel_used = fuel_rate_brake * dt
-        fuel -= fuel_used
-        mass -= fuel_used
-        
-        velocity_decrement = target_deltaV * (dt / brake_time)
-        velocity = max(0, velocity - velocity_decrement)
-        
-        x_position += velocity * 0.3 * dt
-        y_position += velocity * 0.7 * dt
-        
-        acceleration = -stage["thrust"] / mass if mass > 0 else 0
-        
-        print(f"{time_elapsed:8.1f} | {velocity:13.2f} | {x_position/1000:6.1f} | {y_position/1000:6.1f} | {fuel/1000:8.1f}")
+for t in time_steps_3:
+    dt = 20
+    time_elapsed = t
     
-    actual_deltaV_brake = calculate_delta_v(mass_start_brake, mass, stage["Isp"], g0)
+    # Расчет для текущего временного интервала
+    fuel_burned = min(fuel_rate_brake * dt, fuel)  # кг
+    
+    # Масса в начале интервала
+    mass_start_interval = mass
+    
+    # Масса в конце интервала
+    mass -= fuel_burned
+    fuel -= fuel_burned
+    
+    dv_interval = g0 * stage["Isp"] * math.log(mass_start_interval / mass)
+    total_deltaV_achieved += dv_interval
+    
+    velocity -= dv_interval
+    
+    avg_velocity = (velocity + dv_interval/2)  # средняя скорость на интервале
+    
+    x_position += avg_velocity * 0.3 * dt  # 30% движения по X
+    y_position += avg_velocity * 0.7 * dt  # 70% движения по Y
+    
+    acceleration = stage["thrust"] / mass_start_interval
+        
+    print(f"{time_elapsed:8.1f} | {velocity:13.2f} | {dv_interval:7.2f} | {x_position/1000:6.1f} | {y_position/1000:6.1f} | {fuel/1000:8.1f} | {mass/1000:8.1f}")
+    
+    actual_deltaV_brake = g0 * stage["Isp"] * math.log(mass_start_brake / mass)
+    remaining_deltaV = g0 * stage["Isp"] * math.log(mass / (mass - fuel)) if fuel > 0 else 0
 
 time.sleep(1)
 
