@@ -19,10 +19,10 @@ def calculate_delta_v(mass_initial, mass_final, isp, g0=9.81):
         return 0
     return g0 * isp * math.log(mass_initial / mass_final)
 
-print("\nKSP МИССИЯ ЛУНА-17")
+print("\nKSP MISSION LUNA-17")
 
 deltaV_required = {
-    "Взлёт с Кербина": 3400,
+    "Взлет с Кербина": 3400,
     "Переход к Муне": 860,
     "Захват орбиты Муны": 280,
     "Посадка на Муну": 580
@@ -41,7 +41,7 @@ stages = [
     {"name": "3я ступень", "Isp": 350, "thrust": 250000, "burn_time": 300, "fuel_frac": 0.10}
 ]
 
-print("\nЭТАП 1: ВЗЛЁТ С КЕРБИНА (требуется Δv = 3400 м/с)")
+print("\nSTAGE 1: TAKEOFF FROM KERBIN (requires Delta-v = 3400 m/s)")
 print("="*80)
 
 time_elapsed = 0
@@ -57,12 +57,12 @@ pitch_angle = 90
 pitch_rad = math.radians(pitch_angle)
 
 stage = stages[0]
-target_deltaV = deltaV_required["Взлёт с Кербина"]
+target_deltaV = deltaV_required["Взлет с Кербина"]
 mass_after_stage1 = mass / math.exp(target_deltaV / (g0 * stage["Isp"]))
 fuel_needed_stage1 = mass - mass_after_stage1
 fuel_rate = fuel_needed_stage1 / stage["burn_time"]
 
-print("Время(с) | Скорость(м/с) | OX(км) | OY(км) | Топливо(т)")
+print("Time(s) | Speed(m/s) | OX(km) | OY(km) | Fuel(t)")
 print("-" * 80)
 
 print(f"{time_elapsed:8.1f} | {velocity:13.2f} | {x_position/1000:6.1f} | {y_position/1000:6.1f} | {fuel/1000:8.1f}")
@@ -73,9 +73,6 @@ pitch_schedule = [
 
 time_steps = [10, 30, 60, 90, 110]
 
-vx = 0.0
-vy = 0.0
-    
 for t in time_steps:
     dt = t - time_elapsed
     time_elapsed = t
@@ -100,19 +97,12 @@ for t in time_steps:
     g = gravity(altitude)
     gravity_force = mass * g
     thrust = stage["thrust"]
-    
-    velocity = math.sqrt(vx**2 + vy**2)
-    
-    if velocity > 0.01:
-        velocity_angle = math.atan2(vy, vx)
-    else:
-        velocity_angle = pitch_angle
       
     thrust_x = thrust * math.cos(pitch_rad)
     thrust_y = thrust * math.sin(pitch_rad)
     
-    drag_x = - drag_force * math.cos(velocity_angle)
-    drag_y = - drag_force * math.sin(velocity_angle)
+    drag_x = drag_force * math.cos(pitch_rad)
+    drag_y = drag_force * math.sin(pitch_rad)
     
     force_x = thrust_x - drag_x
     force_y = thrust_y - drag_y - gravity_force
@@ -120,16 +110,16 @@ for t in time_steps:
     acceleration_x = force_x / mass if mass > 0 else 0
     acceleration_y = force_y / mass if mass > 0 else 0
     acceleration_total = math.sqrt(acceleration_x**2 + acceleration_y**2)
-   
+    
     current_velocity_x = velocity * math.cos(pitch_rad)
     current_velocity_y = velocity * math.sin(pitch_rad)
     
-    vx = current_velocity_x + acceleration_x * dt
-    vy = current_velocity_y + acceleration_y * dt
-    velocity = math.sqrt(vx**2 + vy**2)
+    new_velocity_x = current_velocity_x + acceleration_x * dt
+    new_velocity_y = current_velocity_y + acceleration_y * dt
+    velocity = math.sqrt(new_velocity_x**2 + new_velocity_y**2)
     
-    x_position += vx * dt
-    y_position += vy * dt
+    x_position += new_velocity_x * dt
+    y_position += new_velocity_y * dt
     altitude = y_position
     
     if x_position < 0:
@@ -145,11 +135,11 @@ actual_deltaV_stage1 = calculate_delta_v(M0_total, mass, stage["Isp"], g0)
 mass_before_sep = mass
 mass *= (1 - stage["fuel_frac"])
 fuel *= (1 - stage["fuel_frac"])
-print(f"• ОТДЕЛЕНИЕ: масса {mass_before_sep/1000:.1f} т → {mass/1000:.1f} т")
+print(f"SEPARATION: mass {mass_before_sep/1000:.1f} t -> {mass/1000:.1f} t")
 
 time.sleep(1)
 
-print("\nЭТАП 2: ПЕРЕХОД К МУНЕ (требуется Δv = 860 м/с)")
+print("\nSTAGE 2: TRANSITION TO MOON (requires Delta-v = 860 m/s)")
 print("="*80)
 
 stage = stages[1]
@@ -159,7 +149,7 @@ mass_start = mass
 target_velocity = velocity + target_deltaV
 burn_time = 120
 
-print("Время(с) | Скорость(м/с) | OX(км) | OY(км) | Топливо(т)")
+print("Time(s) | Speed(m/s) | OX(km) | OY(km) | Fuel(t)")
 print("-" * 80)
 
 current_pitch = 70
@@ -207,74 +197,47 @@ fuel *= (1 - stage["fuel_frac"])
 
 time.sleep(1)
 
-print("\nЭТАП 3: ЗАХВАТ ОРБИТЫ МУНЫ (требуется Δv = 280 м/с)")
+print("\nSTAGE 3: CAPTURE OF THE MOON'S ORBIT (requires Delta-v = 280 m/s)")
 print("="*80)
 
 stage = stages[2]
 target_deltaV = deltaV_required["Захват орбиты Муны"]
 
-g_moon = 1.63
-moon_radius = 200_000  
-
-print("Время(с) | Скорость(м/с) | OX(км) | OY(км) | Топливо(т)")
+print("Time(s) | Speed(m/s) | OX(km) | OY(km) | Fuel(t)")
 print("-" * 80)
 
-# Начальные параметры для этапа торможения
 mass_start_brake = mass
-velocity_start_brake = velocity
+fuel_needed_brake = mass_start_brake - (mass_start_brake / math.exp(target_deltaV / (g0 * stage["Isp"])))
 
-# Расчет потребного топлива
-fuel_needed_brake = mass_start_brake * (1 - 1 / math.exp(target_deltaV / (g0 * stage["Isp"])))
-
-# Параметры подлёта к Луне
-approach_angle = math.radians(30)  # угол подлёта 30° к горизонту
-initial_altitude = 100000  # начальная высота над поверхностью Луны (100 км)
-initial_horizontal_distance = 0  # начальное горизонтальное положение
-
-# Начальные компоненты скорости
-vx = velocity_start_brake * math.cos(approach_angle)
-vy = -velocity_start_brake * math.sin(approach_angle)
-
-
-brake_time = 60
-fuel_rate_brake = fuel_needed_brake / brake_time
+if fuel >= fuel_needed_brake:
+    brake_time = 60
+    fuel_rate_brake = fuel_needed_brake / brake_time
     
-time_steps_3 = [250, 270, 290, 310]
+    time_steps_3 = [250, 270, 290, 310]
     
-for t in time_steps_3:
-    dt = 20
-    time_elapsed = t
-    
-    # Расчет для текущего временного интервала
-    fuel_burned = min(fuel_rate_brake * dt, fuel)  # кг
-    
-    # Масса в начале интервала
-    mass_start_interval = mass
-    
-    # Масса в конце интервала
-    mass -= fuel_burned
-    fuel -= fuel_burned
-    
-    dv_interval = g0 * stage["Isp"] * math.log(mass_start_interval / mass)
-    total_deltaV_achieved += dv_interval
-    
-    velocity -= dv_interval
-    
-    avg_velocity = (velocity + dv_interval/2)  # средняя скорость на интервале
-    
-    x_position += avg_velocity * 0.3 * dt  # 30% движения по X
-    y_position += avg_velocity * 0.7 * dt  # 70% движения по Y
-    
-    acceleration = stage["thrust"] / mass_start_interval
+    for t in time_steps_3:
+        dt = 20
+        time_elapsed = t
         
-    print(f"{time_elapsed:8.1f} | {velocity:13.2f} | {dv_interval:7.2f} | {x_position/1000:6.1f} | {y_position/1000:6.1f} | {fuel/1000:8.1f} | {mass/1000:8.1f}")
+        fuel_used = fuel_rate_brake * dt
+        fuel -= fuel_used
+        mass -= fuel_used
+        
+        velocity_decrement = target_deltaV * (dt / brake_time)
+        velocity = max(0, velocity - velocity_decrement)
+        
+        x_position += velocity * 0.3 * dt
+        y_position += velocity * 0.7 * dt
+        
+        acceleration = -stage["thrust"] / mass if mass > 0 else 0
+        
+        print(f"{time_elapsed:8.1f} | {velocity:13.2f} | {x_position/1000:6.1f} | {y_position/1000:6.1f} | {fuel/1000:8.1f}")
     
-    actual_deltaV_brake = g0 * stage["Isp"] * math.log(mass_start_brake / mass)
-    remaining_deltaV = g0 * stage["Isp"] * math.log(mass / (mass - fuel)) if fuel > 0 else 0
+    actual_deltaV_brake = calculate_delta_v(mass_start_brake, mass, stage["Isp"], g0)
 
 time.sleep(1)
 
-print("\nЭТАП 4: ПОСАДКА НА МУНУ (требуется Δv = 580 м/с)")
+print("\nSTAGE 4: MOON LANDING (requires Delta-v = 580 m/s)")
 print("="*80)
 
 mass_lander = min(mass, 8000)
@@ -285,7 +248,7 @@ g_moon = 1.62
 isp_landing = 310
 thrust_landing = 40000
 
-print("Время(с) | Скорость(м/с) | Высота(м) | Топливо(кг)")
+print("Time(s) | Speed(m/s) | Height(m) | Fuel(kg)")
 print("-" * 80)
 
 print(f"{time_elapsed:8.1f} | {velocity_landing:13.0f} | {altitude_landing:9.0f} | {fuel_lander:10.0f}")
@@ -324,14 +287,8 @@ for t in time_steps_landing:
     print(f"{time_elapsed:8.1f} | {current_velocity:13.1f} | {current_altitude:9.0f} | {current_fuel:10.0f}")
     
     if current_altitude <= 0:
-        print(f"\n★ ПОСАДКА НА МУНУ ВЫПОЛНЕНА!")
+        print(f"\n*** THE MOON LANDING IS COMPLETED! ***")
         break
 
-print(f"\nСВОДКА Δv")
-print(f"• Взлёт с Кербина: {actual_deltaV_stage1:.0f} м/с (требовалось: {deltaV_required['Взлёт с Кербина']} м/с)")
-print(f"• Переход к Муне: {actual_deltaV_stage2:.0f} м/с (требовалось: {deltaV_required['Переход к Муне']} м/с)")
-print(f"• Захват орбиты: {actual_deltaV_brake:.0f} м/с (требовалось: {deltaV_required['Захват орбиты Муны']} м/с)")
-print(f"• Посадка: {deltaV_required['Посадка на Муну']} м/с")
-
-print(f"\n★ Миссия выполнена успешно! ★")
+print(f"\n The mission has been completed successfully!")
 print("="*80)
